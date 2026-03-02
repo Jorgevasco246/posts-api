@@ -1,3 +1,4 @@
+import { Pool } from 'pg';
 import {
   AuthenticateUserDTO,
   CreateUserDTO,
@@ -7,24 +8,42 @@ import {
 
 export class AuthRepository {
   private users: User[];
+  private pool: Pool;
 
-  constructor() {
+  constructor(pool: Pool) {
+    this.pool = pool;
     this.users = [];
   }
 
-  getUserById = (userId: string): User | null => {
-    const userFound = this.users.find((user) => user.id === userId);
+  getUserById = async (userId: string): Promise<User | null> => {
+    const dbRequest = await this.pool.query(
+      'SELECT * FROM users WHERE id = $1',
+      [userId]
+    );
 
-    return userFound ?? null;
+    if (dbRequest.rowCount === 0) {
+      return null;
+    }
+
+    return dbRequest.rows[0];
   };
 
-  getUserByEmail = (email: string): User | null => {
-    const userFound = this.users.find((user) => user.email === email);
+  getUserByEmail = async (email: string): Promise<User | null> => {
+    const dbRequest = await this.pool.query(
+      'SELECT * FROM users WHERE email = $1',
+      [email]
+    );
 
-    return userFound ?? null;
+    if (dbRequest.rowCount === 0) {
+      return null;
+    }
+
+    return dbRequest.rows[0];
   };
 
-  getUserByEmailAndPassword = (authUser: AuthenticateUserDTO): User | null => {
+  getUserByEmailAndPassword = async (
+    authUser: AuthenticateUserDTO
+  ): Promise<User | null> => {
     const userFound = this.users.find(
       (user) =>
         user.email === authUser.email && user.password === authUser.password
@@ -33,7 +52,7 @@ export class AuthRepository {
     return userFound ?? null;
   };
 
-  createUser = (data: CreateUserDTO): User => {
+  createUser = async (data: CreateUserDTO): Promise<User> => {
     const newUser: User = {
       id: crypto.randomUUID(),
       email: data.email,
@@ -43,11 +62,21 @@ export class AuthRepository {
       address: data.address ?? null,
     };
 
-    this.users.push(newUser);
-    return newUser;
+    const dbRequest = await this.pool.query(
+      'INSERT INTO users (email, name, address, password, role) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [
+        newUser.email,
+        newUser.name,
+        newUser.address,
+        newUser.password,
+        newUser.role,
+      ]
+    );
+
+    return dbRequest.rows[0];
   };
 
-  updateUser = (user: UpdateUserDTO): User => {
+  updateUser = async (user: UpdateUserDTO): Promise<User> => {
     const { id, name, address } = user;
     const userIndex = this.users.findIndex((user) => user.id === id);
 

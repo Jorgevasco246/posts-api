@@ -14,8 +14,8 @@ export class AuthService {
     this.authRepository = authRepository;
   }
 
-  getUserById = (userId: string): User => {
-    const userFound = this.authRepository.getUserById(userId);
+  getUserById = async (userId: string): Promise<User> => {
+    const userFound = await this.authRepository.getUserById(userId);
 
     if (!userFound) {
       throw Boom.notFound('User not found');
@@ -24,9 +24,11 @@ export class AuthService {
     return userFound;
   };
 
-  authenticateUser = (credentials: AuthenticateUserDTO): User => {
+  authenticateUser = async (
+    credentials: AuthenticateUserDTO
+  ): Promise<User> => {
     const userFound =
-      this.authRepository.getUserByEmailAndPassword(credentials);
+      await this.authRepository.getUserByEmailAndPassword(credentials);
 
     if (!userFound) {
       throw Boom.unauthorized('Invalid credentials');
@@ -35,14 +37,14 @@ export class AuthService {
     return userFound;
   };
 
-  createUser = (data: CreateUserDTO): User => {
-    const emailTaken = this.authRepository.getUserByEmail(data.email);
+  createUser = async (data: CreateUserDTO): Promise<User> => {
+    const emailTaken = await this.authRepository.getUserByEmail(data.email);
 
     if (emailTaken) {
       throw Boom.conflict('Email already in use');
     }
 
-    const newUser = this.authRepository.createUser({
+    const newUser = await this.authRepository.createUser({
       email: data.email,
       password: data.password,
       role: data.role,
@@ -53,15 +55,15 @@ export class AuthService {
     return newUser;
   };
 
-  updateUser = (user: UpdateUserDTO): User => {
+  updateUser = async (user: UpdateUserDTO): Promise<User> => {
     const { id, name, address } = user;
-    const userExists = this.authRepository.getUserById(id);
+    const userExists = await this.authRepository.getUserById(id);
 
     if (!userExists) {
       throw Boom.notFound('User not found');
     }
 
-    const userUpdated = this.authRepository.updateUser({
+    const userUpdated = await this.authRepository.updateUser({
       id,
       name,
       address,
