@@ -5,8 +5,10 @@ The following tables must be created in the DB before running the application.
 ## Users
 
 ```sql
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
 CREATE TABLE users (
-    id UUID NOT NULL PRIMARY KEY,
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     email TEXT NOT NULL UNIQUE,
     name TEXT NULL,
     address TEXT NULL,
