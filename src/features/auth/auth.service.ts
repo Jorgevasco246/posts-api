@@ -1,4 +1,3 @@
-import { AuthRepository } from './auth.repository';
 import {
   AuthenticateUserDTO,
   CreateUserDTO,
@@ -6,69 +5,64 @@ import {
   User,
 } from './auth.types';
 import Boom from '@hapi/boom';
+import { pool } from '../../config/database';
 
-export class AuthService {
-  private authRepository: AuthRepository;
+export const getUsersService = async (): Promise<User[]> => {
+  const dbRequest = await pool.query('SELECT * FROM users');
+  return dbRequest.rows;
+};
 
-  constructor(authRepository: AuthRepository) {
-    this.authRepository = authRepository;
+export const getUserByIdService = async (userId: string): Promise<User> => {
+  const dbRequest = await pool.query('SELECT * FROM users WHERE id = $1', [
+    userId,
+  ]);
+
+  if (dbRequest.rowCount === 0) {
+    throw Boom.notFound('User not found');
   }
 
-  getUserById = async (userId: string): Promise<User> => {
-    const userFound = await this.authRepository.getUserById(userId);
+  return dbRequest.rows[0];
+};
 
-    if (!userFound) {
-      throw Boom.notFound('User not found');
-    }
+export const authenticateUserService = async (
+  credentials: AuthenticateUserDTO
+): Promise<User> => {
+  const dbRequest = await pool.query(
+    'SELECT * FROM users WHERE email = $1 AND password = $2',
+    [credentials.email, credentials.password]
+  );
 
-    return userFound;
-  };
+  if (dbRequest.rowCount === 0) {
+    throw Boom.unauthorized('Invalid credentials');
+  }
 
-  authenticateUser = async (
-    credentials: AuthenticateUserDTO
-  ): Promise<User> => {
-    const userFound =
-      await this.authRepository.getUserByEmailAndPassword(credentials);
+  return dbRequest.rows[0];
+};
 
-    if (!userFound) {
-      throw Boom.unauthorized('Invalid credentials');
-    }
+export const updateUserService = async (user: UpdateUserDTO): Promise<User> => {
+  const userFound = await getUserByIdService(user.id);
 
-    return userFound;
-  };
+  const name = user.name === undefined ? userFound.name : user.name;
+  const address = user.address === undefined ? userFound.address : user.address;
 
-  createUser = async (data: CreateUserDTO): Promise<User> => {
-    const emailTaken = await this.authRepository.getUserByEmail(data.email);
+  const dbRequest = await pool.query(
+    'UPDATE users SET name = $1, address = $2 WHERE id = $3 RETURNING *',
+    [name, address, user.id]
+  );
 
-    if (emailTaken) {
-      throw Boom.conflict('Email already in use');
-    }
+  return dbRequest.rows[0];
+};
 
-    const newUser = await this.authRepository.createUser({
-      email: data.email,
-      password: data.password,
-      role: data.role,
-      name: data.name,
-      address: data.address,
-    });
+export const deleteUserService = async (userId: string): Promise<void> => {
+  const userFound = await getUserByIdService(userId);
+  await pool.query('DELETE FROM users WHERE id = $1', [userFound.id]);
+};
 
-    return newUser;
-  };
+export const createUserService = async (user: CreateUserDTO): Promise<User> => {
+  const dbRequest = await pool.query(
+    'INSERT INTO users (email, password, role) VALUES ($1, $2, $3) RETURNING *',
+    [user.email, user.password, user.role]
+  );
 
-  updateUser = async (user: UpdateUserDTO): Promise<User> => {
-    const { id, name, address } = user;
-    const userExists = await this.authRepository.getUserById(id);
-
-    if (!userExists) {
-      throw Boom.notFound('User not found');
-    }
-
-    const userUpdated = await this.authRepository.updateUser({
-      id,
-      name,
-      address,
-    });
-
-    return userUpdated;
-  };
-}
+  return dbRequest.rows[0];
+};
